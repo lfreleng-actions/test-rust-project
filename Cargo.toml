@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 The Linux Foundation
+
+[package]
+name = "lfreleng-test-rust-project"
+version = "0.1.0"
+edition = "2021"
+description = "Sample Rust crate used for testing lfreleng-actions"
+license = "Apache-2.0"
+repository = "https://github.com/lfreleng-actions/test-rust-project"
+readme = "README.md"
+keywords = ["testing", "ci", "fixture"]
+categories = ["development-tools::testing"]
+# Keep the packaged .crate small and free of repository scaffolding.
+include = ["/src", "/tests", "/README.md", "/LICENSE"]
+
+[dependencies]

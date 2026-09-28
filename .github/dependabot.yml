@@ -16,3 +16,12 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 15
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "Chore(cargo)"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 15
