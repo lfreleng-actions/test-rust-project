@@ -27,7 +27,20 @@ against it exercise their own behaviour rather than a complex build:
 - An `include` list that keeps the packaged `.crate` to the sources,
   tests, this README and the licence.
 
-The crate is not for publication. Consuming workflows run
+## On crates.io
+
+The Linux Foundation publishes this crate to crates.io as
+[`lfreleng-test-rust-project`](https://crates.io/crates/lfreleng-test-rust-project),
+for two reasons:
+
+- Release tooling needs a real published crate to test against. For
+  example, rust-crate-publish-action compares a package with the
+  version already on crates.io before uploading.
+- Tests that check the name keep working, because nobody else can
+  publish a crate under it.
+
+This sample crate serves testing tools, not projects that depend on
+it, and its API may change in any release. Consuming workflows run
 `cargo publish --dry-run` against it, which reads the crates.io index
 but uploads nothing.
 
