@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 The Linux Foundation
+
+[package]
+# Publishable on purpose. crates.io rejects names over 64 characters,
+# so this one can never be uploaded or collide with a real crate.
+name = "lfreleng-fixture-workspace-core-name-too-long-for-crates-io-by-design"
+description = "Library member of the lfreleng-actions workspace fixture"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dev-dependencies]
+lfreleng-fixture-workspace-support = { path = "../support" }

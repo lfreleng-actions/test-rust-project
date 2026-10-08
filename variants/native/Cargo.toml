@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 The Linux Foundation
+
+# Fixture: links a system library. See README.md.
+[package]
+name = "lfreleng-fixture-native"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+build = "build.rs"

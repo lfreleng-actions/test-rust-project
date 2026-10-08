@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 The Linux Foundation
+
+version = 1
+
+# Cargo regenerates lockfiles and drops any header added to them, so
+# the variants' copyright and licence information lives here.
+[[annotations]]
+path = ["*/Cargo.lock"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The Linux Foundation"
+SPDX-License-Identifier = "Apache-2.0"

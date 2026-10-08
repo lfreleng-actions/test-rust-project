@@ -63,6 +63,44 @@ but uploads nothing.
 Pin `ref` to a commit SHA, so a change here cannot alter the results
 of a consuming workflow unannounced.
 
+## Fixture variants
+
+The root crate avoids dependencies, workspaces and features on
+purpose. Directories under `variants/` cover those shapes instead.
+Select one by checking out this repository as usual and passing its
+directory as `path_prefix`:
+
+<!-- markdownlint-disable MD013 -->
+
+| `path_prefix`                             | Shape                                                   | Exercises                                         |
+| ----------------------------------------- | ------------------------------------------------------- | ------------------------------------------------- |
+| `test-rust-project/variants/workspace`    | Virtual workspace: library, binary, unpublished helper  | `workspace`, `packages`, `exclude`, publish order |
+| `test-rust-project/variants/no-lockfile`  | Library with no `Cargo.lock` in git                     | `lockfile_required`                               |
+| `test-rust-project/variants/msrv`         | `rust-version = "1.85"`, `rust-toolchain.toml` 1.90.0   | MSRV test matrix with two legs                    |
+| `test-rust-project/variants/dependencies` | One crates.io dependency (`semver`), committed lockfile | Audit, SBOM and vulnerability scans               |
+| `test-rust-project/variants/native`       | Links the system libsodium; `setup.sh` installs it      | `setup_script: setup.sh`                          |
+| `test-rust-project/variants/features`     | Default and optional features, a test per selection     | `features`, `all_features`, `no_default_features` |
+
+<!-- markdownlint-enable MD013 -->
+
+The `path_prefix` values assume the checkout `path` shown above.
+Each variant's own README describes what it exercises.
+
+The variants live here, rather than in separate fixture repositories,
+which leaves callers one repository and one pinned commit. They stay
+apart from the root crate:
+
+- None is a member of a root workspace. Each is its own package or
+  workspace, with its own lockfile and `target` directory.
+- The root `include` list keeps them out of the published `.crate`.
+- Every variant package sets `publish = false`, except the two
+  publishable members of the workspace variant. Their names run past
+  the 64 characters crates.io accepts, so they can never collide with
+  a real crate, and the registry rejects any upload.
+- `.github/workflows/testing.yaml` builds and tests each variant in a
+  job of its own. Of the variants, Dependabot watches
+  `variants/dependencies`, the one with a crates.io dependency.
+
 ## Building locally
 
 ```bash

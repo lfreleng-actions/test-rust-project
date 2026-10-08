@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 The Linux Foundation
+
+[package]
+# Publishable on purpose; see the note in ../core/Cargo.toml.
+name = "lfreleng-fixture-workspace-cli-name-too-long-for-crates-io-by-design"
+description = "Binary member of the lfreleng-actions workspace fixture"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "fixture-workspace-cli"
+path = "src/main.rs"
+
+[dependencies]
+lfreleng-fixture-workspace-core-name-too-long-for-crates-io-by-design = { path = "../core", version = "0.1.0" }
