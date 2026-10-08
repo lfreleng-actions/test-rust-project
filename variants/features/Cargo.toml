@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 The Linux Foundation
+
+# Fixture: optional features with a default. See README.md.
+[package]
+name = "lfreleng-fixture-features"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[features]
+default = ["english"]
+english = []
+french = []
+shout = []
