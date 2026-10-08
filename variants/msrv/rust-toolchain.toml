@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 The Linux Foundation
+
+# Newer than rust-version in Cargo.toml, so an MSRV test matrix runs
+# two legs: this toolchain and 1.85.
+[toolchain]
+channel = "1.90.0"
+profile = "minimal"
+components = ["clippy", "rustfmt"]

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 The Linux Foundation
+
+# Fixture: an MSRV below the pinned toolchain. See README.md.
+[package]
+name = "lfreleng-fixture-msrv"
+version = "0.1.0"
+# Edition 2024 needs Rust 1.85, so the declared MSRV is the real one.
+edition = "2024"
+rust-version = "1.85"
+license = "Apache-2.0"
+publish = false
