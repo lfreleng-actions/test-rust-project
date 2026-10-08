@@ -79,3 +79,138 @@ jobs:
           size="$(wc -c < "$crate")"
           echo "Packaged crate: $crate (${size// /} bytes) ✅"
           echo "Packaged crate: ${size// /} bytes ✅" >> "$GITHUB_STEP_SUMMARY"
+
+  # Keep the fixtures under variants/ green. Each leg proves the
+  # property its variant exists to provide, not only that it builds.
+  variants:
+    name: "Build/test variant ${{ matrix.variant }}"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - "workspace"
+          - "no-lockfile"
+          - "msrv"
+          - "dependencies"
+          - "native"
+          - "features"
+    defaults:
+      run:
+        shell: bash
+        working-directory: "variants/${{ matrix.variant }}"
+    env:
+      VARIANT: ${{ matrix.variant }}
+    steps:
+      # yamllint disable-line rule:line-length
+      - uses: lfreleng-actions/harden-runner-block-action@a32eb064a1188f6b0f15d2c0c0381efe54b0dd22  # v0.12.2
+        with:
+          config: '@538904e241556d101fb908b50e2a2965fa0346cf'  # v0.16.6
+
+      - name: 'Harden runner (block)'
+        # yamllint disable-line rule:line-length
+        uses: step-security/harden-runner@351661ca32ac09a36dc5ee2d536e3128f2a3c8ed  # v2.22.0
+        with:
+          egress-policy: 'block'
+          allowed-endpoints: >
+            ${{ env.CONNECTION_ALLOW_LIST }}
+
+      - name: "Checkout repository"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Twice: the second run proves the script is idempotent.
+      - name: "Run setup script"
+        if: matrix.variant == 'native'
+        run: |
+          # Run setup script
+          bash setup.sh
+          bash setup.sh
+
+      - name: "Install pinned and MSRV toolchains"
+        if: matrix.variant == 'msrv'
+        run: |
+          # Install pinned and MSRV toolchains
+          # Without arguments rustup installs what rust-toolchain.toml names.
+          rustup toolchain install
+          msrv="$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[0].rust_version')"
+          rustup toolchain install "$msrv" --profile minimal
+          echo "MSRV=$msrv" >> "$GITHUB_ENV"
+
+      - name: "Check the lockfile"
+        run: |
+          # Check the lockfile
+          if [ "$VARIANT" = "no-lockfile" ]; then
+            if [ -e Cargo.lock ]; then
+              echo "::error::variants/no-lockfile must not carry a Cargo.lock"
+              exit 1
+            fi
+            cargo generate-lockfile
+          else
+            git ls-files --error-unmatch Cargo.lock
+          fi
+
+      - name: "Check formatting"
+        run: |
+          # Check formatting
+          cargo --version
+          cargo fmt --all --check
+
+      - name: "Lint with Clippy and run tests"
+        if: matrix.variant != 'features'
+        run: |
+          # Lint with Clippy and run tests
+          scope=()
+          if [ "$VARIANT" = "workspace" ]; then
+            scope=(--workspace)
+          fi
+          cargo clippy "${scope[@]}" --all-targets --locked -- -D warnings
+          cargo test "${scope[@]}" --locked
+
+      # Each selection compiles one named test; require that test.
+      - name: "Lint and test each feature selection"
+        if: matrix.variant == 'features'
+        run: |
+          # Lint and test each feature selection
+          log="$RUNNER_TEMP/features-test.log"
+          check() {
+            local expected="$1"
+            shift
+            echo "::group::Features: ${*:-default}"
+            cargo clippy --all-targets --locked "$@" -- -D warnings
+            cargo test --locked "$@" 2>&1 | tee "$log"
+            echo "::endgroup::"
+            if ! grep -q "^test tests::$expected \.\.\. ok$" "$log"; then
+              echo "::error::Features ${*:-default}: $expected did not run"
+              exit 1
+            fi
+          }
+          check english_by_default
+          check plain_without_features --no-default-features
+          check french_when_enabled --features french
+          check every_feature_together --all-features
+
+      - name: "Test on the MSRV"
+        if: matrix.variant == 'msrv'
+        run: |
+          # Test on the MSRV
+          RUSTUP_TOOLCHAIN="$MSRV" cargo --version
+          RUSTUP_TOOLCHAIN="$MSRV" cargo test --locked
+
+      # The dry run reads the crates.io index but uploads nothing.
+      - name: "Package and dry-run publish the workspace"
+        if: matrix.variant == 'workspace'
+        run: |
+          # Package and dry-run publish the workspace
+          cargo package --workspace --locked
+          cargo publish --dry-run --workspace --locked --no-verify
+
+      - name: "Summary"
+        run: |
+          # Summary
+          echo "Variant $VARIANT: passed ✅" >> "$GITHUB_STEP_SUMMARY"
