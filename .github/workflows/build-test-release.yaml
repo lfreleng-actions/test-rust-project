@@ -1,0 +1,209 @@
+---
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 The Linux Foundation
+
+# Publishes the crate to crates.io through Trusted Publishing when a
+# release tag (v<crate version>) is pushed.
+#
+# crates.io trusts this workflow by its file name and the 'production'
+# environment, so renaming either stops publication. Publication needs
+# two jobs to pass: one validates the tag as release.yaml does, the
+# other compiles, tests and verifies the crate without credentials.
+# The publish job holds the only OIDC grant, compiles nothing, and
+# uploads the archive only when its digest matches the verified one.
+name: "Build, Test and Release 🦀"
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions: {}
+
+# Never cancel a release in flight; repeated pushes of one tag queue.
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: false
+
+env:
+  # The digest check needs both jobs to package with the same Cargo.
+  # The repository selects no toolchain, so pin one here rather than
+  # take whatever 'stable' each runner image happens to carry.
+  RUSTUP_TOOLCHAIN: "1.99.0"
+  # Install that toolchain only in the explicit step below; otherwise
+  # rustup auto-installs it there with the default profile first.
+  RUSTUP_AUTO_INSTALL: "0"
+
+jobs:
+  validate-tag:
+    name: "Validate release tag"
+    # Deleting a tag also fires a push event; publish nothing for it.
+    if: "!github.event.deleted"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 10
+    steps:
+      # yamllint disable-line rule:line-length
+      - uses: lfreleng-actions/harden-runner-block-action@a32eb064a1188f6b0f15d2c0c0381efe54b0dd22  # v0.12.2
+        with:
+          config: '@538904e241556d101fb908b50e2a2965fa0346cf'  # v0.16.6
+
+      - name: "Harden runner (block)"
+        # yamllint disable-line rule:line-length
+        uses: step-security/harden-runner@351661ca32ac09a36dc5ee2d536e3128f2a3c8ed  # v2.22.0
+        with:
+          egress-policy: "block"
+          allowed-endpoints: >
+            ${{ env.CONNECTION_ALLOW_LIST }}
+
+      - name: "Checkout repository with tags"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      # The checks release.yaml applies by default, repeated here
+      # because that workflow runs independently and cannot stop an
+      # upload, which crates.io never reverses. The recency check
+      # means a failed publish job needs "Re-run failed jobs", which
+      # keeps this job's result, rather than a re-run of every job.
+      - name: "Validate tag"
+        # yamllint disable-line rule:line-length
+        uses: lfreleng-actions/tag-validate-action@63470621b8ebc5c4fc86ebb616727dd0a7285dd9  # v1.1.7
+        with:
+          token: ${{ github.token }}
+          require_type: "semver"
+          require_signed: "ssh,gpg-unverifiable"
+          require_github: "true"
+          reject_development: "true"
+          enforce_increment: "true"
+          require_branch: ${{ github.event.repository.default_branch }}
+          require_recent: "true"
+          require_latest: "true"
+
+  verify:
+    name: "Build, test and verify crate"
+    # Deleting a tag also fires a push event; publish nothing for it.
+    if: "!github.event.deleted"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    outputs:
+      crate_sha256: ${{ steps.verify.outputs.crate_sha256 }}
+    steps:
+      # yamllint disable-line rule:line-length
+      - uses: lfreleng-actions/harden-runner-block-action@a32eb064a1188f6b0f15d2c0c0381efe54b0dd22  # v0.12.2
+        with:
+          config: '@538904e241556d101fb908b50e2a2965fa0346cf'  # v0.16.6
+
+      - name: "Harden runner (block)"
+        # yamllint disable-line rule:line-length
+        uses: step-security/harden-runner@351661ca32ac09a36dc5ee2d536e3128f2a3c8ed  # v2.22.0
+        with:
+          egress-policy: "block"
+          allowed-endpoints: >
+            ${{ env.CONNECTION_ALLOW_LIST }}
+
+      - name: "Checkout tagged commit"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: "Install Rust toolchain"
+        shell: bash
+        run: |
+          # Install Rust toolchain
+          rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal \
+            --component rustfmt,clippy
+          cargo --version
+
+      - name: "Check formatting"
+        shell: bash
+        run: |
+          # Check formatting
+          cargo fmt --check
+
+      - name: "Lint with Clippy"
+        shell: bash
+        run: |
+          # Lint with Clippy
+          cargo clippy --all-targets --locked -- -D warnings
+
+      - name: "Run tests"
+        shell: bash
+        run: |
+          # Run tests
+          cargo test --locked
+
+      # Packages, compiles and dry-run publishes the crate, checks the
+      # tag against the crate version and crates.io, then reports the
+      # SHA-256 of the archive it verified.
+      - name: "Verify crate for release"
+        id: verify
+        # yamllint disable-line rule:line-length
+        uses: lfreleng-actions/rust-crate-publish-action@5e816ea426eb9bf01bc5a06658271ea16349b0e1  # v0.0.1
+        with:
+          dry_run: "true"
+          release_tag: ${{ github.ref_name }}
+
+  publish:
+    name: "Publish crate to crates.io"
+    needs:
+      - validate-tag
+      - verify
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://crates.io/crates/lfreleng-test-rust-project
+    permissions:
+      contents: read
+      id-token: write  # crates.io Trusted Publishing
+    timeout-minutes: 10
+    steps:
+      # yamllint disable-line rule:line-length
+      - uses: lfreleng-actions/harden-runner-block-action@a32eb064a1188f6b0f15d2c0c0381efe54b0dd22  # v0.12.2
+        with:
+          config: '@538904e241556d101fb908b50e2a2965fa0346cf'  # v0.16.6
+
+      - name: "Harden runner (block)"
+        # yamllint disable-line rule:line-length
+        uses: step-security/harden-runner@351661ca32ac09a36dc5ee2d536e3128f2a3c8ed  # v2.22.0
+        with:
+          egress-policy: "block"
+          allowed-endpoints: >
+            ${{ env.CONNECTION_ALLOW_LIST }}
+
+      - name: "Checkout tagged commit"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: "Install Rust toolchain"
+        shell: bash
+        run: |
+          # Install Rust toolchain
+          rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
+          cargo --version
+
+      # Exchanges this job's OIDC token for a short-lived crates.io
+      # token, which the action's post step revokes.
+      - name: "Authenticate to crates.io"
+        id: auth
+        # yamllint disable-line rule:line-length
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18  # v1.0.5
+
+      # Repackages without running crate code and uploads only an
+      # archive identical to the one the verify job compiled and tested.
+      - name: "Publish crate"
+        # yamllint disable-line rule:line-length
+        uses: lfreleng-actions/rust-crate-publish-action@5e816ea426eb9bf01bc5a06658271ea16349b0e1  # v0.0.1
+        with:
+          release_tag: ${{ github.ref_name }}
+          registry_token: ${{ steps.auth.outputs.token }}
+          expected_sha256: ${{ needs.verify.outputs.crate_sha256 }}
