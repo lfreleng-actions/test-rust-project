@@ -114,5 +114,13 @@ cargo run --locked -- Cargo
 `.github/workflows/testing.yaml` runs the same checks on every pull
 request, followed by `cargo publish --dry-run`.
 
+## Releasing
+
+Each release tag names the crate version it publishes, with a leading
+`v`: version `0.1.1` in `Cargo.toml` ships as tag `v0.1.1`. Bump the
+version in `Cargo.toml` and `Cargo.lock` in a pull request first, then
+tag. Tags up to `v0.0.3` predate this rule and do not match their
+crate versions.
+
 [pre-commit.ci results page]: https://results.pre-commit.ci/latest/github/lfreleng-actions/test-rust-project/main
 [pre-commit.ci status badge]: https://results.pre-commit.ci/badge/github/lfreleng-actions/test-rust-project/main.svg
