@@ -25,3 +25,15 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 15
+  # The one fixture variant with a crates.io dependency. The others
+  # have none, so watching them would only add empty runs. Callers pin
+  # this repository by commit, so a bump never reaches them unasked.
+  - package-ecosystem: "cargo"
+    directory: "/variants/dependencies"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "Chore(cargo)"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
