@@ -132,7 +132,7 @@ git tag -s v0.1.1 -m "v0.1.1" origin/main
 git push origin v0.1.1
 ```
 
-Sign the tag and push it straight away. Both workflows below reject
+Sign the tag and push it straight away. The release workflow rejects
 an unsigned tag, a tag more than three minutes old, one off the
 current tip of `main`, and one not above every earlier version tag.
 
@@ -150,6 +150,10 @@ stored anywhere:
    allowed an OIDC token, exchanges it for a short-lived crates.io
    token. It repackages the crate without compiling it, and uploads
    the archive if its SHA-256 matches the verified one.
+3. Once the crate is on crates.io, a last job publishes the GitHub
+   release for the tag, the draft release-drafter prepared, or a new
+   one, and marks it as the latest release. A tag that fails any
+   earlier check never gets a published GitHub release.
 
 crates.io accepts uploads from this workflow file alone, running in the
 `production` environment, whose deployment rule admits tags matching
@@ -164,9 +168,10 @@ the tag's age. Re-running a release that already reached crates.io
 uploads nothing: the action finds the identical archive there and
 skips.
 
-`.github/workflows/release.yaml` also runs on every tag push, checks
-the tag, and publishes the matching draft GitHub release. The two
-workflows run independently.
+This is the repository's one tag-push workflow, as in the Python
+release lane. A second workflow on the same event would act on tags
+this one rejects, and could publish a GitHub release for a crate
+version that never reached crates.io.
 
 [pre-commit.ci results page]: https://results.pre-commit.ci/latest/github/lfreleng-actions/test-rust-project/main
 [pre-commit.ci status badge]: https://results.pre-commit.ci/badge/github/lfreleng-actions/test-rust-project/main.svg
