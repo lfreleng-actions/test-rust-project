@@ -2,15 +2,19 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 The Linux Foundation
 
-# Publishes the crate to crates.io through Trusted Publishing when a
-# release tag (v<crate version>) is pushed.
+# Releases the crate when a release tag (v<crate version>) is pushed:
+# publishes it to crates.io through Trusted Publishing, then promotes
+# the matching GitHub release.
 #
 # crates.io trusts this workflow by its file name and the 'production'
 # environment, so renaming either stops publication. Publication needs
-# two jobs to pass: one validates the tag as release.yaml does, the
-# other compiles, tests and verifies the crate without credentials.
-# The publish job holds the only OIDC grant, compiles nothing, and
-# uploads the archive only when its digest matches the verified one.
+# two jobs to pass: one validates the tag, the other compiles, tests
+# and verifies the crate without credentials. The publish job holds the
+# only OIDC grant, compiles nothing, and uploads the archive only when
+# its digest matches the verified one. The GitHub release is promoted
+# last, so a tag that fails any check never yields a published release.
+# This is the repository's one tag-push workflow, as in the Python
+# release lane: a second one would act on tags this one rejects.
 name: "Build, Test and Release 🦀"
 
 # yamllint disable-line rule:truthy
@@ -44,6 +48,8 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.tag.outputs.tag_name }}
     steps:
       # yamllint disable-line rule:line-length
       - uses: lfreleng-actions/harden-runner-block-action@a32eb064a1188f6b0f15d2c0c0381efe54b0dd22  # v0.12.2
@@ -65,12 +71,13 @@ jobs:
           fetch-tags: true
           persist-credentials: false
 
-      # The checks release.yaml applies by default, repeated here
-      # because that workflow runs independently and cannot stop an
-      # upload, which crates.io never reverses. The recency check
-      # means a failed publish job needs "Re-run failed jobs", which
-      # keeps this job's result, rather than a re-run of every job.
+      # The organisation's release checks: a signed SemVer tag, newer
+      # than every earlier one, on the tip of the default branch, and
+      # pushed within the last three minutes. Because of the recency
+      # check, a failed later job needs "Re-run failed jobs", which keeps
+      # this job's result, rather than a re-run of every job.
       - name: "Validate tag"
+        id: tag
         # yamllint disable-line rule:line-length
         uses: lfreleng-actions/tag-validate-action@63470621b8ebc5c4fc86ebb616727dd0a7285dd9  # v1.1.7
         with:
@@ -207,3 +214,62 @@ jobs:
           release_tag: ${{ github.ref_name }}
           registry_token: ${{ steps.auth.outputs.token }}
           expected_sha256: ${{ needs.verify.outputs.crate_sha256 }}
+
+  # Publishes the GitHub release for the tag once the crate is on
+  # crates.io, drafting one first if release-drafter has not. Both
+  # steps are idempotent, so re-running a failed job is safe.
+  promote-release:
+    name: "Promote GitHub release"
+    needs:
+      - validate-tag
+      - publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Draft and publish the release for the tag
+    timeout-minutes: 5
+    steps:
+      # yamllint disable-line rule:line-length
+      - uses: lfreleng-actions/harden-runner-block-action@a32eb064a1188f6b0f15d2c0c0381efe54b0dd22  # v0.12.2
+        with:
+          config: '@538904e241556d101fb908b50e2a2965fa0346cf'  # v0.16.6
+
+      - name: "Harden runner (block)"
+        # yamllint disable-line rule:line-length
+        uses: step-security/harden-runner@351661ca32ac09a36dc5ee2d536e3128f2a3c8ed  # v2.22.0
+        with:
+          egress-policy: "block"
+          allowed-endpoints: >
+            ${{ env.CONNECTION_ALLOW_LIST }}
+
+      # gh resolves the repository from the checkout's remote.
+      - name: "Checkout tagged commit"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: "Check the release state"
+        id: state
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate-tag.outputs.tag }}
+        run: |
+          # Check the release state
+          if ! draft="$(gh release view "$TAG" --json isDraft \
+              --jq .isDraft 2> /dev/null)"; then
+            echo "Creating a draft release for $TAG"
+            gh release create "$TAG" --draft --verify-tag \
+              --title "$TAG" --notes "Release $TAG"
+            draft=true
+          fi
+          echo "draft=$draft" >> "$GITHUB_OUTPUT"
+
+      - name: "Promote draft release"
+        if: steps.state.outputs.draft == 'true'
+        # yamllint disable-line rule:line-length
+        uses: lfreleng-actions/draft-release-promote-action@e420b392557c9b1eea642f0d54dec4ff39086d5f  # v0.1.5
+        with:
+          token: ${{ github.token }}
+          tag: ${{ needs.validate-tag.outputs.tag }}
+          latest: "true"
