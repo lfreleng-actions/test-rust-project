@@ -1,0 +1,15 @@
+---
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 The Linux Foundation
+
+# A Model B release file, for rust-workflows' merge lane tests. The
+# merge lane treats a commit that adds a YAML file here as a release
+# of the version it names. Nothing in this repository reads it: this
+# repository releases through tags (see README.md).
+#
+# It names the version of variants/workspace, so callers run the merge
+# lane with path_prefix: variants/workspace. The publishable members
+# of that workspace have names longer than crates.io accepts, so the
+# registry never holds this version: a dry run always finds it absent
+# and passes, and no upload can ever succeed.
+version: 0.1.0

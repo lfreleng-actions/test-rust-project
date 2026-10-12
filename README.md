@@ -101,6 +101,27 @@ apart from the root crate:
   job of its own. Of the variants, Dependabot watches
   `variants/dependencies`, the one with a crates.io dependency.
 
+## Model B release file
+
+`releases/workspace-0.1.0.yaml` serves rust-workflows' merge lane,
+which treats a merged commit that adds a YAML file under `releases/`
+as a release of the version the file names. The commit that added it
+gives that lane's self-test a release to verify, with
+`path_prefix: variants/workspace`: a dry run checks the version against
+the workspace's crates and crates.io, and stops before publishing or
+tagging.
+
+The file names the workspace variant's version, not the root crate's.
+The publishable members of that workspace have names longer than
+crates.io accepts, so the registry never holds the version, every dry
+run finds it absent, and no upload can succeed. The root crate would
+not do: any commit after its release tag packages a different archive,
+which a dry run for an already-published version rejects.
+
+Nothing in this repository reads `releases/`. This repository releases
+through tags, as [Releasing](#releasing) describes. Leave the file in
+place: callers pin the commit that added it.
+
 ## Building locally
 
 ```bash
