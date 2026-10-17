@@ -153,7 +153,7 @@ jobs:
       - name: "Verify crate for release"
         id: verify
         # yamllint disable-line rule:line-length
-        uses: lfreleng-actions/rust-crate-publish-action@5e816ea426eb9bf01bc5a06658271ea16349b0e1  # v0.0.1
+        uses: lfreleng-actions/rust-crate-publish-action@3d8f7294648ec1f47e2aa48b71bed96418de5ba1  # v0.1.0
         with:
           dry_run: "true"
           release_tag: ${{ github.ref_name }}
@@ -209,7 +209,7 @@ jobs:
       # archive identical to the one the verify job compiled and tested.
       - name: "Publish crate"
         # yamllint disable-line rule:line-length
-        uses: lfreleng-actions/rust-crate-publish-action@5e816ea426eb9bf01bc5a06658271ea16349b0e1  # v0.0.1
+        uses: lfreleng-actions/rust-crate-publish-action@3d8f7294648ec1f47e2aa48b71bed96418de5ba1  # v0.1.0
         with:
           release_tag: ${{ github.ref_name }}
           registry_token: ${{ steps.auth.outputs.token }}
