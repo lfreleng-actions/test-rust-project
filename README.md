@@ -138,56 +138,52 @@ request, followed by `cargo publish --dry-run`.
 ## Releasing
 
 Each release tag names the crate version it publishes, with a leading
-`v`: version `0.1.1` in `Cargo.toml` ships as tag `v0.1.1`. Bump the
-version in `Cargo.toml` and `Cargo.lock` in a pull request first, then
-tag. Tags up to `v0.0.3` predate this rule and do not match their
-crate versions.
+`v`: tag `v0.1.3` publishes version `0.1.3`. `Cargo.toml` and
+`Cargo.lock` keep the placeholder `0.0.0`, and the release lane writes
+the tag's version over it before building, verifying and publishing.
+A release needs no version-bump pull request. Tags up to
+`v0.0.3` predate this scheme and do not match their crate versions;
+`v0.1.0` to `v0.1.2` came from manifests carrying the version.
 
-Wait for the version-bump pull request to merge, then tag its merge
-commit, so the published crate carries what `main` holds.
-Here `origin` names `lfreleng-actions/test-rust-project`:
+Tag the tip of `main`, so the published crate carries what `main`
+holds. Here `origin` names `lfreleng-actions/test-rust-project`:
 
 ```bash
 git fetch origin
-git tag -s v0.1.1 -m "v0.1.1" origin/main
-git push origin v0.1.1
+git tag -s v0.1.3 -m "v0.1.3" origin/main
+git push origin v0.1.3
 ```
 
-Sign the tag and push it straight away. The release workflow rejects
-an unsigned tag, a tag more than three minutes old, one off the
-current tip of `main`, and one not above every earlier version tag.
+Sign the tag and push it. The release lane rejects an unsigned tag,
+one off the current tip of `main`, and one not above every earlier
+version tag.
 
-Pushing a `v*` tag starts `.github/workflows/build-test-release.yaml`,
-which publishes through crates.io Trusted Publishing, with no API token
-stored anywhere:
-
-1. Two unprivileged jobs run side by side. One validates the tag with
-   tag-validate-action. The other checks formatting, runs Clippy and
-   the tests, then runs rust-crate-publish-action as a dry run. That
-   packages, compiles and dry-run publishes the crate, checks the tag
-   against the crate version and crates.io, and records the archive's
-   SHA-256.
-2. Once both pass, a job in the `production` environment, the one job
-   allowed an OIDC token, exchanges it for a short-lived crates.io
-   token. It repackages the crate without compiling it, and uploads
-   the archive if its SHA-256 matches the verified one.
-3. Once the crate is on crates.io, a last job publishes the GitHub
-   release for the tag, the draft release-drafter prepared, or a new
-   one, and marks it as the latest release. A tag that fails any
-   earlier check never gets a published GitHub release.
+Pushing a `v<major>.<minor>.<patch>` tag starts
+`.github/workflows/build-test-release.yaml`, a thin caller of the
+Rust release lane in
+[rust-workflows](https://github.com/lfreleng-actions/rust-workflows)
+(`build-test-release.yaml`, Model A, `version_source: tag`). The
+lane validates the tag, resolves one exact toolchain for the run,
+builds the crate and its binary, audits and scans the dependency graph,
+runs the tests, dry-runs the publish to record the archive's SHA-256,
+attaches the `.crate`, the binary, the SBOMs and `SHA256SUMS` to a
+draft GitHub release with build provenance attestations and Sigstore
+bundles, publishes through crates.io Trusted Publishing, and then
+promotes the release. A tag that fails any earlier check never gets a
+published GitHub release or a crates.io upload.
 
 crates.io accepts uploads from this workflow file alone, running in the
 `production` environment, whose deployment rule admits tags matching
 `v[0-9]*.[0-9]*.[0-9]*` alone. Renaming either breaks publication
 until the crate's trusted publisher settings on crates.io change to
-match. The verifying and
-publishing jobs pin the same Rust toolchain through `RUSTUP_TOOLCHAIN`,
-because a different Cargo version would produce a different archive.
-If the publishing job fails, use "Re-run failed jobs": it keeps the
-passed tag validation, which a full re-run would repeat and fail on
-the tag's age. Re-running a release that already reached crates.io
-uploads nothing: the action finds the identical archive there and
-skips.
+match. crates.io matches the OIDC `workflow_ref` claim, which names
+the caller's file, so the publish job can sit inside the reusable
+workflow; this repository's first release through the lane is the
+proof of that. The publish job alone holds a crates.io credential,
+runs no crate code, and uploads nothing but an archive byte-identical
+to the one `crate-verify` compiled and tested, with the same Cargo.
+Re-running a release that already reached crates.io uploads nothing:
+the action finds the identical archive there and skips.
 
 This is the repository's one tag-push workflow, as in the Python
 release lane. A second workflow on the same event would act on tags
