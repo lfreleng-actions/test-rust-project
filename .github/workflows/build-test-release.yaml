@@ -49,7 +49,7 @@ jobs:
       pull-requests: read   # repository-metadata-action queries PR data
       issues: read          # grype-scan-action reads cve-bypass issues
     # yamllint disable-line rule:line-length
-    uses: lfreleng-actions/rust-workflows/.github/workflows/build-test-release.yaml@0506f2415c6374ac562496f017a06e5b8b8a4ae9  # v0.0.1
+    uses: lfreleng-actions/rust-workflows/.github/workflows/build-test-release.yaml@a729f000aa0cf325bb77badaf6420274a028845b  # v0.3.0
     with:
       version_source: "tag"
       publish_enabled: true
